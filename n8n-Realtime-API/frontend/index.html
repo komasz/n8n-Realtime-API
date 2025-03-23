@@ -53,6 +53,16 @@
                 <div class="form-group">
                     <label for="webhook-url">URL Webhooka N8N:</label>
                     <input type="text" id="webhook-url" placeholder="https://twoja-instancja-n8n.com/webhook/sciezka">
+                    
+                    <!-- Dodany element wyboru modelu -->
+                    <div class="form-group" id="model-selector-container">
+                        <label for="model-selector">Model transkrypcji:</label>
+                        <select id="model-selector" class="form-control">
+                            <option value="standard">Standard (gpt-4o-transcribe)</option>
+                            <option value="mini">Mini (gpt-4o-mini-transcribe)</option>
+                        </select>
+                    </div>
+                    
                     <button id="save-settings" class="btn">Zapisz</button>
                 </div>
                 <div class="form-group">
@@ -67,6 +77,7 @@
                     <h3>Jak używać</h3>
                     <ol>
                         <li>Wprowadź URL webhooka n8n w ustawieniach</li>
+                        <li>Wybierz model transkrypcji (standard lub mini)</li>
                         <li>Kliknij przycisk <i class="fas fa-play"></i> aby rozpocząć sesję</li>
                         <li>Kliknij przycisk <i class="fas fa-microphone"></i> aby zacząć mówić</li>
                         <li>Twoja wypowiedź zostanie przetworzona i wysłana do n8n</li>
