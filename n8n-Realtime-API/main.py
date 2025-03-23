@@ -148,26 +148,11 @@ async def create_realtime_session() -> Dict[str, Any]:
             "OpenAI-Beta": "realtime=v1" # Required for beta access
         }
         
-        # Session configuration - setup for Polish language
+        # Session configuration - updated to remove extra_init_events
         payload = {
-            "model": "gpt-4o-realtime-preview-2024-12-17", # Use the latest available model
-            "voice": "ash", # Voice to use for TTS
-            # Configure session for Polish language
-            "extra_init_events": [
-                {
-                    "type": "session.update",
-                    "session": {
-                        "instructions": "Będziesz prowadzić rozmowy po polsku. Gdy użytkownik mówi po polsku, odpowiadaj również po polsku. Staraj się mówić naturalnym, konwersacyjnym językiem.",
-                        "turn_detection": {
-                            "type": "semantic_vad",
-                            "eagerness": "high",
-                            "create_response": True,
-                            "interrupt_response": True
-                        },
-                        "include": ["item.input_audio_transcription.logprobs"]
-                    }
-                }
-            ]
+            "model": "gpt-4o-realtime-preview-2024-12-17",
+            "voice": "ash"
+            # Polish language configuration will be sent by client after connection
         }
         
         # Make the API request
