@@ -63,6 +63,9 @@ async def create_session(request: RealtimeSessionRequest):
     Create a new Realtime API session and return ephemeral token.
     """
     try:
+        # Log webhook URL
+        logger.info(f"Creating session with webhook URL: {request.webhook_url}")
+        
         # Create a new session
         session_data = await create_realtime_session()
         
@@ -72,6 +75,10 @@ async def create_session(request: RealtimeSessionRequest):
             active_sessions[session_id] = {
                 "webhook_url": request.webhook_url
             }
+            logger.info(f"Stored webhook URL for session {session_id}: {request.webhook_url}")
+            logger.info(f"Active sessions now: {active_sessions}")
+        else:
+            logger.error("No session ID received from create_realtime_session")
         
         return session_data
     except Exception as e:
@@ -109,10 +116,13 @@ async def n8n_webhook(session_id: str, request: Request):
         # Get the webhook URL for this session
         session = active_sessions.get(session_id)
         if not session:
+            logger.error(f"Session {session_id} not found in active sessions for webhook endpoint")
+            logger.info(f"Active sessions: {active_sessions}")
             raise HTTPException(status_code=404, detail="Session not found")
             
         # Get the request body
         body = await request.json()
+        logger.info(f"Received webhook request from n8n: {body}")
         
         # Return the response formatted for Realtime API
         realtime_event = await format_n8n_response_for_realtime(
@@ -132,22 +142,30 @@ async def forward_to_n8n(data: N8nRealtimeResponse):
     Forward transcription from Realtime API to n8n webhook.
     """
     try:
+        logger.info(f"Received transcription to forward: {data.transcription}")
+        logger.info(f"Session ID: {data.session_id}")
+        
         # Get the webhook URL for this session
         session = active_sessions.get(data.session_id)
         if not session:
+            logger.error(f"Session {data.session_id} not found in active sessions")
+            logger.info(f"Active sessions: {active_sessions}")
             raise HTTPException(status_code=404, detail="Session not found")
             
         webhook_url = session["webhook_url"]
+        logger.info(f"Found webhook URL for session: {webhook_url}")
         
         # Send the transcription to n8n
+        logger.info(f"Sending to n8n: {data.transcription}")
         n8n_response = await send_to_n8n(webhook_url, {
             "transcription": data.transcription,
             "session_id": data.session_id
         })
         
+        logger.info(f"Received response from n8n: {n8n_response}")
         return n8n_response
     except Exception as e:
-        logger.error(f"Error forwarding to n8n: {str(e)}")
+        logger.error(f"Error forwarding to n8n: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 # Config endpoint to get frontend configuration
