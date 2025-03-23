@@ -12,6 +12,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const webhookUrlInput = document.getElementById('webhook-url');
     const saveSettingsButton = document.getElementById('save-settings');
     
+    // Dodajemy nowe elementy UI dla wyboru modelu
+    let modelSelector = document.getElementById('model-selector');
+    
     // Application state
     let peerConnection = null;
     let dataChannel = null;
@@ -23,15 +26,73 @@ document.addEventListener('DOMContentLoaded', () => {
     let conversationEntryCount = 0;
     const MAX_CONVERSATION_ENTRIES = 10;
     let isProcessingTranscription = false;
+    let selectedModel = "standard"; // Domyślny model
     
     // Load saved webhook URL from localStorage
     webhookUrlInput.value = localStorage.getItem('webhookUrl') || '';
+    
+    // Pobranie konfiguracji i utworzenie select dla modeli
+    async function initializeModelSelector() {
+        try {
+            const configResponse = await fetch('/api/config');
+            if (configResponse.ok) {
+                const config = await configResponse.json();
+                
+                // Sprawdź, czy mamy elementy wyboru modelu w HTML
+                if (!modelSelector) {
+                    // Jeśli nie istnieje, tworzymy nowy element
+                    const settingsContainer = document.querySelector('.form-group');
+                    
+                    if (settingsContainer) {
+                        const modelSelectorHtml = `
+                            <div class="form-group">
+                                <label for="model-selector">Model transkrypcji:</label>
+                                <select id="model-selector" class="form-control">
+                                    <option value="standard">Standard (gpt-4o-transcribe)</option>
+                                    <option value="mini">Mini (gpt-4o-mini-transcribe)</option>
+                                </select>
+                            </div>
+                        `;
+                        
+                        // Wstawiamy element przed przycikiem zapisz
+                        settingsContainer.insertAdjacentHTML('beforeend', modelSelectorHtml);
+                        modelSelector = document.getElementById('model-selector');
+                        
+                        // Załaduj zapisany model z localStorage
+                        const savedModel = localStorage.getItem('selectedModel');
+                        if (savedModel) {
+                            modelSelector.value = savedModel;
+                            selectedModel = savedModel;
+                        }
+                        
+                        // Dodaj obsługę zmiany modelu
+                        modelSelector.addEventListener('change', function() {
+                            selectedModel = this.value;
+                            console.log(`Wybrano model: ${selectedModel}`);
+                        });
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Błąd podczas pobierania konfiguracji:', error);
+        }
+    }
+    
+    // Inicjalizacja selektora modelu przy załadowaniu strony
+    initializeModelSelector();
 
     // Save webhook URL to localStorage
     saveSettingsButton.addEventListener('click', () => {
         const webhookUrl = webhookUrlInput.value.trim();
         if (webhookUrl) {
             localStorage.setItem('webhookUrl', webhookUrl);
+            
+            // Zapisz również wybrany model
+            if (modelSelector) {
+                localStorage.setItem('selectedModel', modelSelector.value);
+                selectedModel = modelSelector.value;
+            }
+            
             showMessage('Ustawienia zapisane pomyślnie!', 'success');
         } else {
             showMessage('Proszę wprowadzić poprawny adres URL webhooka', 'error');
@@ -75,6 +136,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Request ephemeral token from our backend
             console.log('Wysyłanie żądania o token sesji Realtime...');
             console.log('Webhook URL:', webhookUrl);
+            console.log('Wybrany model:', selectedModel);
             
             const tokenResponse = await fetch('/api/realtime/session', {
                 method: 'POST',
@@ -82,7 +144,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    webhook_url: webhookUrl
+                    webhook_url: webhookUrl,
+                    model_type: selectedModel  // Przekazujemy wybrany model
                 })
             });
             
@@ -256,7 +319,9 @@ document.addEventListener('DOMContentLoaded', () => {
             // Send SDP offer to OpenAI Realtime API
             console.log('Wysyłanie oferty SDP do OpenAI...');
             const baseUrl = "https://api.openai.com/v1/realtime";
-            const model = "gpt-4o-realtime";  // Uaktualniamy nazwę modelu
+            
+            // Pobieramy model z danych sesji
+            const model = selectedModel === "mini" ? "gpt-4o-mini-transcribe" : "gpt-4o-transcribe";
             console.log(`Używany model: ${model}`);
             console.log(`Token: ${ephemeralToken.substring(0, 5)}...`);
             
