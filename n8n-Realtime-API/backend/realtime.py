@@ -31,25 +31,12 @@ async def create_realtime_session() -> Dict[str, Any]:
         }
         
         # Session configuration - setup for Polish language
+        # Without using extra_init_events which is not supported
         payload = {
             "model": "gpt-4o-realtime-preview-2024-12-17", # Use the latest available model
             "voice": "ash", # Voice to use for TTS
-            # Configure session for Polish language
-            "extra_init_events": [
-                {
-                    "type": "session.update",
-                    "session": {
-                        "instructions": "Będziesz prowadzić rozmowy po polsku. Gdy użytkownik mówi po polsku, odpowiadaj również po polsku. Staraj się mówić naturalnym, konwersacyjnym językiem.",
-                        "turn_detection": {
-                            "type": "semantic_vad",
-                            "eagerness": "high",
-                            "create_response": True,
-                            "interrupt_response": True
-                        },
-                        "include": ["item.input_audio_transcription.logprobs"]
-                    }
-                }
-            ]
+            # Instructions for Polish language will be sent as a session.update event
+            # after the session is created by the client
         }
         
         # Make the API request
