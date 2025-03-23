@@ -45,6 +45,7 @@ class FrontendConfig(BaseModel):
 # Realtime API session request
 class RealtimeSessionRequest(BaseModel):
     webhook_url: str
+    model_type: Optional[str] = "standard"  # "standard" lub "mini"
 
 # n8n response for realtime
 class N8nRealtimeResponse(BaseModel):
@@ -63,11 +64,12 @@ async def create_session(request: RealtimeSessionRequest):
     Create a new Realtime API session and return ephemeral token.
     """
     try:
-        # Log webhook URL
+        # Log webhook URL and model type
         logger.info(f"Creating session with webhook URL: {request.webhook_url}")
+        logger.info(f"Using model type: {request.model_type}")
         
-        # Create a new session
-        session_data = await create_realtime_session()
+        # Create a new session with specified model type
+        session_data = await create_realtime_session(model_type=request.model_type)
         
         # Store webhook URL with session ID
         session_id = session_data.get('id')
@@ -176,7 +178,8 @@ async def get_config():
     """
     return {
         "realtime_api_enabled": True,
-        "version": "2.0.0"
+        "version": "2.0.0",
+        "available_models": ["standard", "mini"]  # Dodano dostępne modele
     }
 
 # Health check endpoint
