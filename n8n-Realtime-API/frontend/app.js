@@ -73,6 +73,9 @@ document.addEventListener('DOMContentLoaded', () => {
             startButton.disabled = true;
             
             // Request ephemeral token from our backend
+            console.log('Wysyłanie żądania o token sesji Realtime...');
+            console.log('Webhook URL:', webhookUrl);
+            
             const tokenResponse = await fetch('/api/realtime/session', {
                 method: 'POST',
                 headers: {
@@ -84,10 +87,14 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             
             if (!tokenResponse.ok) {
-                throw new Error('Nie udało się utworzyć sesji Realtime');
+                const errorText = await tokenResponse.text();
+                console.error('Błąd odpowiedzi:', errorText);
+                throw new Error(`Nie udało się utworzyć sesji Realtime: ${errorText}`);
             }
             
             const data = await tokenResponse.json();
+            console.log('Odpowiedź z API sesji:', data);
+            
             ephemeralToken = data.client_secret.value;
             sessionId = data.id;
             
@@ -120,42 +127,90 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Send Polish language configuration
     function sendPolishLanguageConfig() {
-        if (!dataChannel || dataChannel.readyState !== 'open') {
-            console.error('Kanał danych nie jest otwarty');
+        if (!dataChannel) {
+            console.error('Kanał danych nie istnieje');
             return;
         }
         
-        // Send session update with Polish language configuration
-        const polishConfig = {
-            type: "session.update",
-            session: {
-                instructions: "Będziesz prowadzić rozmowy po polsku. Gdy użytkownik mówi po polsku, odpowiadaj również po polsku. Staraj się mówić naturalnym, konwersacyjnym językiem.",
-                turn_detection: {
-                    type: "semantic_vad",
-                    eagerness: "high", 
-                    create_response: true,
-                    interrupt_response: true
-                },
-                include: ["item.input_audio_transcription.logprobs"]
-            }
-        };
+        if (dataChannel.readyState !== 'open') {
+            console.error('Kanał danych nie jest otwarty, stan:', dataChannel.readyState);
+            
+            // Dodajemy event handler, który wyśle konfigurację po otwarciu kanału
+            dataChannel.addEventListener('open', function onceOpen() {
+                console.log('Kanał danych otwarty, wysyłam konfigurację...');
+                sendPolishLanguageConfigInternal();
+                dataChannel.removeEventListener('open', onceOpen);
+            });
+            return;
+        }
         
-        console.log('Wysyłanie konfiguracji języka polskiego:', polishConfig);
-        dataChannel.send(JSON.stringify(polishConfig));
+        sendPolishLanguageConfigInternal();
+    }
+
+    function sendPolishLanguageConfigInternal() {
+        try {
+            // Send session update with Polish language configuration
+            const polishConfig = {
+                type: "session.update",
+                session: {
+                    instructions: "Będziesz prowadzić rozmowy po polsku. Gdy użytkownik mówi po polsku, odpowiadaj również po polsku. Staraj się mówić naturalnym, konwersacyjnym językiem.",
+                    turn_detection: {
+                        type: "semantic_vad",
+                        eagerness: "high", 
+                        create_response: true,
+                        interrupt_response: true
+                    },
+                    include: ["item.input_audio_transcription.logprobs"]
+                }
+            };
+            
+            console.log('Wysyłanie konfiguracji języka polskiego:', polishConfig);
+            const configString = JSON.stringify(polishConfig);
+            console.log('JSON konfiguracji:', configString);
+            
+            dataChannel.send(configString);
+            console.log('Konfiguracja wysłana pomyślnie');
+        } catch (error) {
+            console.error('Błąd podczas wysyłania konfiguracji:', error);
+        }
     }
     
     // Setup WebRTC connection
     async function setupWebRTC() {
         try {
             // Create a peer connection
-            peerConnection = new RTCPeerConnection();
+            const configuration = {
+                iceServers: [
+                    { urls: 'stun:stun.l.google.com:19302' }
+                ]
+            };
+            peerConnection = new RTCPeerConnection(configuration);
+            
+            // Log connection state changes
+            peerConnection.onconnectionstatechange = (event) => {
+                console.log(`Zmiana stanu połączenia WebRTC: ${peerConnection.connectionState}`);
+                updateConnectionStatus(`WebRTC: ${peerConnection.connectionState}`);
+            };
+            
+            peerConnection.oniceconnectionstatechange = (event) => {
+                console.log(`Zmiana stanu ICE: ${peerConnection.iceConnectionState}`);
+            };
             
             // Setup data channel for events
             dataChannel = peerConnection.createDataChannel('oai-events');
-            dataChannel.onopen = handleDataChannelOpen;
+            dataChannel.onopen = (event) => {
+                console.log('Kanał danych otwarty', event);
+                showMessage('Połączenie z OpenAI ustanowione', 'success');
+            };
             dataChannel.onmessage = handleDataChannelMessage;
-            dataChannel.onclose = handleDataChannelClose;
-            dataChannel.onerror = handleDataChannelError;
+            dataChannel.onclose = (event) => {
+                console.log('Kanał danych zamknięty', event);
+                showMessage('Połączenie z OpenAI zamknięte', 'info');
+            };
+            dataChannel.onerror = (event) => {
+                console.error('Błąd kanału danych', event);
+                showMessage('Błąd komunikacji z OpenAI', 'error');
+            };
             
             // Set up audio element for playing remote audio
             audioElement = new Audio();
@@ -163,32 +218,48 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // Handle remote tracks (audio from OpenAI)
             peerConnection.ontrack = (event) => {
-                console.log('Otrzymano zdalną ścieżkę audio');
+                console.log('Otrzymano zdalną ścieżkę audio', event);
                 audioElement.srcObject = event.streams[0];
             };
             
             // Setup local audio for WebRTC
-            localStream = await navigator.mediaDevices.getUserMedia({
-                audio: {
-                    channelCount: 1,
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    autoGainControl: true
-                }
-            });
-            
-            // Add local stream to peer connection
-            localStream.getTracks().forEach(track => {
-                peerConnection.addTrack(track, localStream);
-            });
+            try {
+                console.log('Próba dostępu do mikrofonu...');
+                localStream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        channelCount: 1,
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true
+                    }
+                });
+                console.log('Dostęp do mikrofonu uzyskany');
+                
+                // Add local stream to peer connection
+                localStream.getTracks().forEach(track => {
+                    console.log('Dodawanie lokalnej ścieżki do połączenia', track);
+                    peerConnection.addTrack(track, localStream);
+                });
+            } catch (mediaError) {
+                console.error('Błąd dostępu do mikrofonu:', mediaError);
+                showMessage(`Błąd dostępu do mikrofonu: ${mediaError.message}`, 'error');
+                throw mediaError;
+            }
             
             // Create and set local description (offer)
+            console.log('Tworzenie oferty SDP...');
             const offer = await peerConnection.createOffer();
+            console.log('Oferta SDP utworzona:', offer);
             await peerConnection.setLocalDescription(offer);
+            console.log('Lokalny opis ustawiony');
             
             // Send SDP offer to OpenAI Realtime API
+            console.log('Wysyłanie oferty SDP do OpenAI...');
             const baseUrl = "https://api.openai.com/v1/realtime";
-            const model = "gpt-4o-realtime-preview-2024-12-17";
+            const model = "gpt-4o-realtime";  // Uaktualniamy nazwę modelu
+            console.log(`Używany model: ${model}`);
+            console.log(`Token: ${ephemeralToken.substring(0, 5)}...`);
+            
             const sdpResponse = await fetch(`${baseUrl}?model=${model}`, {
                 method: "POST",
                 body: offer.sdp,
@@ -198,22 +269,32 @@ document.addEventListener('DOMContentLoaded', () => {
                 },
             });
             
+            console.log('Odpowiedź SDP otrzymana:', sdpResponse.status);
+            
             if (!sdpResponse.ok) {
                 const errorText = await sdpResponse.text();
+                console.error('Błąd odpowiedzi SDP:', errorText);
                 throw new Error(`Błąd SDP: ${errorText}`);
             }
             
             // Get and set remote description (answer)
+            const sdpAnswerText = await sdpResponse.text();
+            console.log('Treść odpowiedzi SDP:', sdpAnswerText.substring(0, 100) + '...');
+            
             const answer = {
                 type: "answer",
-                sdp: await sdpResponse.text(),
+                sdp: sdpAnswerText,
             };
-            await peerConnection.setRemoteDescription(answer);
             
-            console.log('Połączenie WebRTC ustanowione');
+            await peerConnection.setRemoteDescription(answer);
+            console.log('Zdalny opis ustawiony');
+            
+            console.log('Połączenie WebRTC ustanowione pomyślnie');
+            showMessage('Połączenie WebRTC ustanowione', 'success');
             
         } catch (error) {
             console.error('Błąd podczas konfiguracji WebRTC:', error);
+            showMessage(`Błąd WebRTC: ${error.message}`, 'error');
             throw error;
         }
     }
@@ -292,25 +373,20 @@ document.addEventListener('DOMContentLoaded', () => {
         showMessage('Sesja Realtime zakończona.', 'info');
     }
     
-    // Handle data channel events
-    function handleDataChannelOpen(event) {
-        console.log('Kanał danych otwarty', event);
-    }
-    
-    function handleDataChannelClose(event) {
-        console.log('Kanał danych zamknięty', event);
-    }
-    
-    function handleDataChannelError(event) {
-        console.error('Błąd kanału danych', event);
-        showMessage('Błąd komunikacji z OpenAI', 'error');
-    }
-    
     // Process messages from OpenAI
     async function handleDataChannelMessage(event) {
         try {
             const data = JSON.parse(event.data);
             console.log('Otrzymano wiadomość:', data);
+            
+            // Dodajemy bardziej szczegółowe logowanie dla transkrypcji
+            if (data.type === 'conversation.item.input_audio_transcription.completed') {
+                console.log('Szczegóły transkrypcji:', {
+                    transcript: data.transcript,
+                    item_id: data.item_id,
+                    sessionId: sessionId
+                });
+            }
             
             // Handle different event types
             switch (data.type) {
@@ -341,6 +417,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     break;
                     
                 case 'conversation.item.input_audio_transcription.completed':
+                    console.log('TRANSKRYPCJA ZAKOŃCZONA - wywołuję handleTranscriptionCompleted');
                     handleTranscriptionCompleted(data);
                     break;
                     
@@ -371,48 +448,63 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Handle transcription completed event
     async function handleTranscriptionCompleted(data) {
-        console.log('Transkrypcja zakończona', data);
+        console.log('Transkrypcja zakończona - szczegóły:', data);
         
         try {
             // Extract transcription text and item ID
             const transcription = data.transcript;
             const itemId = data.item_id;
             
+            console.log(`Otrzymana transkrypcja: "${transcription}"`);
+            
             // Update conversation UI with transcription
             updateUserMessage(itemId, transcription);
             
             // Forward transcription to n8n
             if (sessionId) {
+                console.log(`Przygotowanie do wysłania transkrypcji do n8n, sessionId: ${sessionId}`);
+                
+                // Tworzenie danych do wysłania
+                const postData = {
+                    transcription: transcription,
+                    session_id: sessionId
+                };
+                
+                console.log('Dane do wysłania:', postData);
+                
                 // Send transcription to our backend to forward to n8n
-                const response = await fetch('/api/forward-to-n8n', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        transcription: transcription,
-                        session_id: sessionId
-                    })
-                });
-                
-                if (!response.ok) {
-                    throw new Error('Nie udało się przekazać transkrypcji do n8n');
+                try {
+                    console.log('Wysyłanie do endpointu /api/forward-to-n8n');
+                    const response = await fetch('/api/forward-to-n8n', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(postData)
+                    });
+                    
+                    console.log('Otrzymano odpowiedź:', response.status);
+                    
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        throw new Error(`Nie udało się przekazać transkrypcji do n8n: ${response.status} - ${errorText}`);
+                    }
+                    
+                    // Log the response
+                    const responseData = await response.json();
+                    console.log('Odpowiedź z n8n:', responseData);
+                    
+                    console.log('Transkrypcja przekazana do n8n');
+                } catch (fetchError) {
+                    console.error('Błąd podczas wysyłania fetch:', fetchError);
+                    throw fetchError;
                 }
-                
-                console.log('Transkrypcja przekazana do n8n');
+            } else {
+                console.error('Brak sessionId - nie można przekazać transkrypcji');
             }
         } catch (error) {
             console.error('Błąd podczas obsługi transkrypcji:', error);
             showMessage(`Błąd: ${error.message}`, 'error');
-        }
-    }
-    
-    // Send event to OpenAI via data channel
-    function sendEvent(event) {
-        if (dataChannel && dataChannel.readyState === 'open') {
-            dataChannel.send(JSON.stringify(event));
-        } else {
-            console.error('Kanał danych nie jest otwarty');
         }
     }
     
