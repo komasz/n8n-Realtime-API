@@ -30,14 +30,14 @@ async def create_realtime_session() -> Dict[str, Any]:
             "OpenAI-Beta": "realtime=v1" # Required for beta access
         }
         
-        # Session configuration - setup for Polish language
-        # Without using extra_init_events which is not supported
+        # Upewnij się, że używasz aktualnego modelu
+        # Używamy nowszej nazwy modelu, która powinna być bardziej stabilna
         payload = {
-            "model": "gpt-4o-realtime-preview-2024-12-17", # Use the latest available model
-            "voice": "ash", # Voice to use for TTS
-            # Instructions for Polish language will be sent as a session.update event
-            # after the session is created by the client
+            "model": "gpt-4o-realtime",  # Używamy podstawowej nazwy modelu
+            "voice": "alloy",  # Użyj głosu alloy, który jest bardziej stabilny
         }
+        
+        logger.info(f"Creating Realtime session with payload: {payload}")
         
         # Make the API request
         response = requests.post(API_URL, headers=headers, json=payload)
@@ -50,6 +50,7 @@ async def create_realtime_session() -> Dict[str, Any]:
         # Return session data including ephemeral token
         session_data = response.json()
         logger.info(f"Created Realtime session with ID: {session_data.get('id')}")
+        logger.info(f"Session data: {session_data}")
         
         return session_data
         
@@ -68,6 +69,8 @@ async def format_n8n_response_for_realtime(text: str, session_id: str) -> Dict[s
     Returns:
         A dictionary formatted for the Realtime API
     """
+    logger.info(f"Formatting n8n response for Realtime API: {text}")
+    
     # Create a conversation.item.create event for the assistant's message
     return {
         "type": "conversation.item.create",
