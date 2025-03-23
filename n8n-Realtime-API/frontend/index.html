@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>N8N Voice Interface - Realtime API</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>N8N Voice Interface</h1>
+            <p class="subtitle">Ciągła komunikacja głosowa z OpenAI Realtime API</p>
+        </header>
+
+        <main>
+            <div class="voice-interface">
+                <div id="status-container">
+                    <div id="status-message">Gotowy do inicjalizacji</div>
+                    <div id="visualization-container">
+                        <div class="visualization-bar"></div>
+                        <div class="visualization-bar"></div>
+                        <div class="visualization-bar"></div>
+                        <div class="visualization-bar"></div>
+                        <div class="visualization-bar"></div>
+                    </div>
+                </div>
+
+                <div class="microphone-container">
+                    <button id="start-button" class="record-button" title="Rozpocznij sesję">
+                        <i class="fas fa-play"></i>
+                    </button>
+                    <button id="record-button" class="record-button" title="Rozpocznij ciągłe słuchanie" disabled>
+                        <i class="fas fa-microphone"></i>
+                    </button>
+                    <button id="stop-button" class="record-button" title="Zakończ sesję" disabled>
+                        <i class="fas fa-stop"></i>
+                    </button>
+                </div>
+                
+                <!-- Conversation container -->
+                <div id="conversation-container" class="conversation-container hidden"></div>
+
+                <!-- Message container -->
+                <div id="message-container" class="hidden">
+                    <div id="message-text"></div>
+                </div>
+            </div>
+
+            <div class="settings-container">
+                <h3>Ustawienia</h3>
+                <div class="form-group">
+                    <label for="webhook-url">URL Webhooka N8N:</label>
+                    <input type="text" id="webhook-url" placeholder="https://twoja-instancja-n8n.com/webhook/sciezka">
+                    <button id="save-settings" class="btn">Zapisz</button>
+                </div>
+                <div class="form-group">
+                    <div id="api-status" class="api-status">
+                        Stan połączenia: <span id="connection-status">Rozłączony</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="info-container">
+                <div class="info-box">
+                    <h3>Jak używać</h3>
+                    <ol>
+                        <li>Wprowadź URL webhooka n8n w ustawieniach</li>
+                        <li>Kliknij przycisk <i class="fas fa-play"></i> aby rozpocząć sesję</li>
+                        <li>Kliknij przycisk <i class="fas fa-microphone"></i> aby zacząć mówić</li>
+                        <li>Twoja wypowiedź zostanie przetworzona i wysłana do n8n</li>
+                        <li>Kliknij <i class="fas fa-stop"></i> aby zakończyć sesję</li>
+                    </ol>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <p>Powered by OpenAI's Realtime API | <a href="https://github.com/yourusername/n8n-voice-interface" target="_blank">View on GitHub</a></p>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
