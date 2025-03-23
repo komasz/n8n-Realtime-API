@@ -1,0 +1,17 @@
+run = "python3 replit-main.py"
+modules = ["python-3.11"]
+
+[nix]
+channel = "stable-24_05"
+
+[env]
+PYTHONPATH = "${PYTHONPATH}:${REPL_HOME}"
+PYTHONUNBUFFERED = "1"
+
+[deployment]
+run = ["sh", "-c", "python3 replit-main.py"]
+deploymentTarget = "cloudrun"
+
+[[ports]]
+localPort = 8080
+externalPort = 80
