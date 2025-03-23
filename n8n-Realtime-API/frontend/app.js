@@ -94,7 +94,7 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log(`Uzyskano token sesji: ${sessionId}`);
             
             // Create WebRTC peer connection
-            setupWebRTC();
+            await setupWebRTC();
             
             // Update UI
             statusMessage.textContent = 'Sesja Realtime zainicjalizowana';
@@ -104,6 +104,11 @@ document.addEventListener('DOMContentLoaded', () => {
             updateConnectionStatus('Połączony');
             showMessage('Sesja Realtime zainicjalizowana. Kliknij mikrofon, aby zacząć mówić.', 'success');
             
+            // Configure session for Polish language
+            setTimeout(() => {
+                sendPolishLanguageConfig();
+            }, 1000); // Wait a second before sending configuration
+            
         } catch (error) {
             console.error('Błąd podczas inicjalizacji sesji:', error);
             showMessage(`Błąd: ${error.message}`, 'error');
@@ -111,6 +116,32 @@ document.addEventListener('DOMContentLoaded', () => {
             updateConnectionStatus('Błąd połączenia');
             statusMessage.textContent = 'Błąd inicjalizacji';
         }
+    }
+    
+    // Send Polish language configuration
+    function sendPolishLanguageConfig() {
+        if (!dataChannel || dataChannel.readyState !== 'open') {
+            console.error('Kanał danych nie jest otwarty');
+            return;
+        }
+        
+        // Send session update with Polish language configuration
+        const polishConfig = {
+            type: "session.update",
+            session: {
+                instructions: "Będziesz prowadzić rozmowy po polsku. Gdy użytkownik mówi po polsku, odpowiadaj również po polsku. Staraj się mówić naturalnym, konwersacyjnym językiem.",
+                turn_detection: {
+                    type: "semantic_vad",
+                    eagerness: "high", 
+                    create_response: true,
+                    interrupt_response: true
+                },
+                include: ["item.input_audio_transcription.logprobs"]
+            }
+        };
+        
+        console.log('Wysyłanie konfiguracji języka polskiego:', polishConfig);
+        dataChannel.send(JSON.stringify(polishConfig));
     }
     
     // Setup WebRTC connection
