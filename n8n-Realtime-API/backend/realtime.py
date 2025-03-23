@@ -11,9 +11,18 @@ logger = logging.getLogger(__name__)
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 API_URL = "https://api.openai.com/v1/realtime/sessions"
 
-async def create_realtime_session() -> Dict[str, Any]:
+# Dostępne modele
+MODELS = {
+    "standard": "gpt-4o-transcribe",
+    "mini": "gpt-4o-mini-transcribe"
+}
+
+async def create_realtime_session(model_type="standard") -> Dict[str, Any]:
     """
     Create a new Realtime API session with OpenAI.
+    
+    Args:
+        model_type: Typ modelu do użycia ("standard" lub "mini")
     
     Returns:
         A dictionary containing session details, including client_secret token
@@ -30,11 +39,13 @@ async def create_realtime_session() -> Dict[str, Any]:
             "OpenAI-Beta": "realtime=v1" # Required for beta access
         }
         
-        # Upewnij się, że używasz aktualnego modelu
-        # Używamy nowszej nazwy modelu, która powinna być bardziej stabilna
+        # Wybierz model na podstawie parametru model_type
+        model = MODELS.get(model_type, MODELS["standard"])
+        
+        # Konfiguracja sesji
         payload = {
-            "model": "gpt-4o-realtime",  # Używamy podstawowej nazwy modelu
-            "voice": "alloy",  # Użyj głosu alloy, który jest bardziej stabilny
+            "model": model,  # Używamy modelu transkrypcji
+            "voice": "alloy",  # Użyj głosu alloy
         }
         
         logger.info(f"Creating Realtime session with payload: {payload}")
@@ -50,6 +61,7 @@ async def create_realtime_session() -> Dict[str, Any]:
         # Return session data including ephemeral token
         session_data = response.json()
         logger.info(f"Created Realtime session with ID: {session_data.get('id')}")
+        logger.info(f"Using model: {model}")
         logger.info(f"Session data: {session_data}")
         
         return session_data
